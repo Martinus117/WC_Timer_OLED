@@ -207,12 +207,15 @@ void dispOled(String txt, int col, int row, bool isClosed) {
   if (!isClosed) 
      u8g2.drawButtonUTF8(xOffset, 36, U8G2_BTN_BW0, 0, 1, 1, "+1m");
   if (stopTimer)
-    u8g2.drawButtonUTF8(xOffset + 41, 36, U8G2_BTN_INV, 0, 1, 1, "Taus");
+    u8g2.drawButtonUTF8(xOffset + 42, 36, U8G2_BTN_INV, 0, 1, 1, "T aus");
   else
-    u8g2.drawButtonUTF8(xOffset + 41, 36, U8G2_BTN_BW0, 0, 1, 1, "Tein");
+    u8g2.drawButtonUTF8(xOffset + 42, 36, U8G2_BTN_BW0, 0, 1, 1, "T ein");
 
-	int temp = static_cast<int>(tState);
-  u8g2.drawButtonUTF8(xOffset + 39, 36, U8G2_BTN_INV, 0, 1, 1, String(temp));
+	 int temp = static_cast<int>(tState);
+   u8g2.setCursor(xOffset + 32, 36);
+   u8g2.print(temp);
+
+   //u8g2.drawButtonUTF8(xOffset + 39, 36, U8G2_BTN_INV, 0, 1, 1, String(temp));
   
   u8g2.sendBuffer();
 }
