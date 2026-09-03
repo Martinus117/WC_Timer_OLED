@@ -23,21 +23,20 @@
 #include <rcswitch.h>
 
 
-#define WINDOW_IS_OPEN   7051018
-#define WINDOW_IS_CLOSED 7051022 
+constexpr int WINDOW_IS_OPEN = 7051018;
+constexpr int WINDOW_IS_CLOSED = 7051022 ;
 
-#define STOP_TIMER_PIN  1
-#define PLUSONE_PIN 2
-#define RX_PIN 20
-#define BEEP_PIN 3  
-#define LED_PIN 1
+constexpr uint8_t STOP_TIMER_PIN = 1;
+constexpr uint8_t PLUSONE_PIN = 2;
+constexpr uint8_t RX_PIN = 20;
+constexpr uint8_t BEEP_PIN = 3;  
+constexpr uint8_t LED_PIN = 1;
 
-#define I2C_SDA 5
-#define I2C_SCL 6
+constexpr uint8_t I2C_SDA = 5;
+constexpr uint8_t I2C_SCL = 6;
 
-#define LED_COUNT 1
-
-int cnt = 0;
+constexpr uint8_t LED_COUNT = 1;
+constexpr unsigned long DEBOUNCE_DELAY = 50; // The debounce time in milliseconds
 
 // display stuff
 // there is no 72x40 constructor in u8g2 hence the 72x40 screen is mapped in the middle of the 132x64 pixel buffer of the SSD1306 controller
@@ -59,9 +58,7 @@ int lastSteadyState = HIGH;  // The previous steady state from the input pin
 int lastFlickerableState = HIGH; // The previous flickerable state from the input pin
 int currentState;            // The current reading from the input pin
 
-
 unsigned long lastDebounceTime = 0;  // The last time the output pin was toggled
-const unsigned long DEBOUNCE_DELAY = 50; // The debounce time in milliseconds
 
 RCSwitch mySwitch = RCSwitch();
 
@@ -71,7 +68,7 @@ TimerState lastTState;
 int numberOfIterations = 3;
 
 hw_timer_t* _timer = NULL;
-volatile int interruptCounter;
+volatile int interruptCounter = 0;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
 void IRAM_ATTR onTimer() {
@@ -79,6 +76,8 @@ void IRAM_ATTR onTimer() {
   interruptCounter++;
   portEXIT_CRITICAL_ISR(&timerMux);
 }
+
+int cnt = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -116,7 +115,11 @@ void setup() {
 
 // the loop function runs over and over again until power down or reset
 void loop() {
-  cnt++;
+  //portENTER_CRITICAL(&timerMux);
+  //interruptCounter = 0;
+  //portEXIT_CRITICAL(&timerMux);
+
+  cnt = interruptCounter;
   prepDisplay(seconds);
   seconds--;
 	Serial.print(seconds);
@@ -130,25 +133,41 @@ void loop() {
     if (retVal == 's') {
       Serial.println("stopTimer pressed");
       stopTimer = !stopTimer;
+      if (stopTimer) {
+        lastTState = tState;
+        tState = (tState == TimerState::Closed) ? TimerState::ClosedNoTimer : TimerState::NoTimer;
+      }
+      else {
+        tState = lastTState;
+			}
     }
-    else if (retVal == 'p' && tState != TimerState::Closed) {
+    else if (retVal == 'p' && (tState != TimerState::Closed) && (tState != TimerState::ClosedNoTimer)) {
       Serial.println("plusOne pressed");
       seconds += 60;
     }
-
     else if (retVal == 'c') {
       Serial.println("Window is closed");
-      tState = TimerState::Closed;
+      lastTState = tState;
+      tState = (tState == TimerState::NoTimer) ? TimerState::ClosedNoTimer : TimerState::Closed;
       seconds = 0;
     }
     else if (retVal == 'o') {
       Serial.println("Window is open");
-      tState = TimerState::TimerA;
+      lastTState = tState;
+      tState = (tState == TimerState::ClosedNoTimer) ? TimerState::NoTimer : TimerState::TimerA;
       seconds = startSeconds;
     }
 		millisToWait -= 500;
   }
   else millisToWait = 1000;
+  
+  if (cnt > 86400) { // 864000 = 24h
+    beep(100);
+    ESP.restart();
+  }
+  
+  Serial.print("Status:");
+  Serial.println(static_cast<int>(tState));
 
 } // loop ends
 // *************************************************************
@@ -161,8 +180,10 @@ void prepDisplay(int sec) {
     int secs = abs(sec % 60);
     int mins = abs((int)sec / 60);
     String minTerm = sec < 0 ? "-" : "0";
-    if (sec < -599) 
-        ms = minTerm + String(mins) + ((sec % 2 == 0) ? ":" : " ") + (secs < 10 ? "0" + String(secs) : String(secs));;
+    if (sec < -599) {
+      ms = minTerm + String(mins) + ((sec % 2 == 0) ? ":" : " ") + (secs < 10 ? "0" + String(secs) : String(secs));
+      ms = ms.substring(0, 5);
+    }
     else {
       ms = mins < 10 ? minTerm + String(mins) : String(mins);
       ms += ":" + (secs < 10 ? "0" + String(secs) : String(secs));
@@ -184,11 +205,15 @@ void dispOled(String txt, int col, int row, bool isClosed) {
   u8g2.print(txt);
   u8g2.setFont(u8g2_font_t0_11_mr);
   if (!isClosed) 
-     u8g2.drawButtonUTF8(xOffset, 36, U8G2_BTN_INV, 0, 1, 1, "+1m");
+     u8g2.drawButtonUTF8(xOffset, 36, U8G2_BTN_BW0, 0, 1, 1, "+1m");
   if (stopTimer)
-    u8g2.drawButtonUTF8(xOffset + 40, 36, U8G2_BTN_INV, 0, 1, 1, "T aus");
+    u8g2.drawButtonUTF8(xOffset + 41, 36, U8G2_BTN_INV, 0, 1, 1, "Taus");
   else
-    u8g2.drawButtonUTF8(xOffset + 40, 36, U8G2_BTN_BW0, 0, 1, 1, "T ein");
+    u8g2.drawButtonUTF8(xOffset + 41, 36, U8G2_BTN_BW0, 0, 1, 1, "Tein");
+
+	int temp = static_cast<int>(tState);
+  u8g2.drawButtonUTF8(xOffset + 39, 36, U8G2_BTN_INV, 0, 1, 1, String(temp));
+  
   u8g2.sendBuffer();
 }
 
@@ -253,7 +278,7 @@ void serPrint(String txt) {
 #endif
 }
 
-void beep(int duration) {
+static void beep(int duration) {
   tone(4, 1000, duration);
   delay(duration);
   noTone(4);
@@ -274,7 +299,7 @@ void beep(int duration) {
 
 }
 
-void dispPixel(int color, int millis) {
+static void dispPixel(int color, int millis) {
   //pixel.setPixelColor(0, color);
   //pixel.show();
   //delay(millis);
@@ -282,7 +307,7 @@ void dispPixel(int color, int millis) {
   //pixel.show();
 }
 
-void dispPixelFade() {
+static void dispPixelFade() {
   //for (int ii = 4; ii <= 22; ii++) {
   //  pixel.setPixelColor(0, ii, ii - 2, 0, 0);
   //  //pixel.setPixelColor(0,1,2,3,4)  n, r, g, b, w
