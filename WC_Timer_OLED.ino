@@ -41,7 +41,7 @@ constexpr uint8_t I2C_SCL = 6;
 constexpr uint8_t LED_COUNT = 1;
 constexpr uint8_t  DEBOUNCE_DELAY = 50; // The debounce time in milliseconds
 
-constexpr uint16_t secondsToOpen1 = 62;
+constexpr uint16_t secondsToOpen1 = 30;
 constexpr uint16_t secondsToOpen2 = 31;
 constexpr uint16_t secondsToOpen3 = 15;
 unsigned int open1Seconds;
@@ -190,10 +190,12 @@ void loop() {
         lastTState = tState;
         tState = TimerState::Opening;
         newState = true;
+        seconds = secondsToOpen1;
       }
     }
   }
   char retValA;
+  millisToWait = 1000;
   if (tState == TimerState::Closing) {
     retValA = dispAlarm(newState);
     // alarmCount is set in dispAlarm
@@ -210,7 +212,7 @@ void loop() {
     if (retValA == 'f') {
       tState = TimerState::Open1;
       newState = true;
-      seconds = secondsToOpen1;
+      //seconds = secondsToOpen1;
     }
   }
   else if (tState == TimerState::Open1) {
@@ -223,17 +225,30 @@ void loop() {
     }
   }
   else if (tState == TimerState::Alarm1) {
-    dispAlarm(newState);
-    if (alarmCount == 0) {
+    retValA = dispAlarm(newState);
+    if (retValA == 'f') {
       tState = TimerState::Open2;
       newState = true;
       seconds = secondsToOpen2;
     }
   }
   else if (tState == TimerState::Open2) {
-
+    retValA = dispAlarm(newState);
+    // open1 finished
+    if (retValA == 'f') {  // if (seconds <= 0) {
+      tState = TimerState::Alarm2;
+      seconds = 0;
+      newState = true;
+    }
   }
   else if (tState == TimerState::Alarm2) {
+    retValA = dispAlarm(newState);
+    if (retValA == 'f') {
+      tState = TimerState::Open3;
+      newState = true;
+      seconds = secondsToOpen3;
+    }
+    //millisToWait = 500;
 
   }
   else if (tState == TimerState::Open3) {
@@ -246,7 +261,7 @@ void loop() {
 
   }
   
-  millisToWait = 1000;
+  
   
   if (cnt > 86400) { // 86'400 = 24h
     beep(100);
@@ -332,22 +347,56 @@ char dispAlarm(bool isNewState) {
       newState = false;
 			endMillisBeep = aktMillis + 100;  
     }
-    else {}
     if (cnt % 10 == 0) {
       color = whiteLow;
-      showPixel = true;
       endMillisLed = aktMillis + 100;
     }
     else showPixel = false;
+    if (seconds <= 0)
+      retVal = 'f';
     break;
 
   case TimerState::Alarm1:
+    if (isNewState) {
+      alarmCount = 11;
+      newState = false;      
+    }
+    color = whiteHigh;
+    endMillisLed = aktMillis + 150;
+    endMillisBeep = aktMillis + 200;
+    alarmCount--;
+    if (alarmCount <= 0)
+      retVal = 'f';
+    break;
 
-    break;
   case TimerState::Open2:
+    if (isNewState) {
+      alarmCount = 11;
+      newState = false;
+      endMillisBeep = aktMillis + 100;
+    }
+    if (cnt % 10 == 0) {
+      color = whiteLow;
+      endMillisLed = aktMillis + 100;
+    }
+    else showPixel = false;
+    if (seconds <= 0)
+      retVal = 'f';
     break;
+
   case TimerState::Alarm2:
+    if (isNewState) {
+      alarmCount = 21;
+      newState = false;
+    }
+    color = whiteHigh;
+    endMillisLed = aktMillis + 150;
+    endMillisBeep = aktMillis + 200;
+    alarmCount--;
+    if (alarmCount <= 0)
+      retVal = 'f';
     break;
+
   case TimerState::Open3:
     break;
   case TimerState::Alarm3:
@@ -364,11 +413,6 @@ char dispAlarm(bool isNewState) {
     if (endMillisBeep > 0) {
       beepOn(true);
     }
-    //delay(ledWait);
-    //pixel.clear();
-    //pixel.show();
-    //if (beepWait > 0)
-    //  beep(beepWait);
   }
   return retVal;
 }
@@ -398,7 +442,7 @@ void prepDisplay(int sec) {
     else if (runSeconds == 1)
       dispOled(" -   ", xCol, 64, isClosed);
     else if (runSeconds == 2)
-      dispOled("  :  ", xCol, 64, isClosed);
+      dispOled("  -  ", xCol, 64, isClosed); // :
     else if (runSeconds == 3)
       dispOled("   - ", xCol, 64, isClosed);
     else if (runSeconds == 4)
@@ -482,6 +526,10 @@ char waitMillis(uint32_t waitMillis) {
       pixel.show();
       endMillisLed = 0;
 		} 
+
+    // status alarm2: zwei beep / led hintereinander
+
+
     if (actMillis >= maxMillis)
       break;
   }
