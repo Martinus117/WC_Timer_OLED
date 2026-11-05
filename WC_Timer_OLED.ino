@@ -13,7 +13,7 @@
 #include <RCSwitch.h>
 #include <Adafruit_NeoPixel.h> 
 
-// #define DEBUG 
+#define NODEBUG 
 //constexpr int WINDOW_IS_OPEN = 4594186; // alt
 constexpr int WINDOW_IS_OPEN = 7051018;
 //constexpr int WINDOW_IS_CLOSED = 4594190; // alt
@@ -110,8 +110,6 @@ void onTimerBeep(TimerHandle_t pxTimer) {
 void onTimerBeep2(TimerHandle_t pxTimer) {
   beepOn(true);
   xTimerChangePeriod(timerBeep, pdMS_TO_TICKS(beepInterval2), 0);
-  //pixelOn(whiteHigh);
-  //xTimerChangePeriod(timerLed, pdMS_TO_TICKS(100), 0);
 }
 void onTimerBeep3(TimerHandle_t pxTimer) {
   beepOn(true);
@@ -120,12 +118,13 @@ void onTimerBeep3(TimerHandle_t pxTimer) {
 }
 
 void serPrint(String txt, bool nl = true) {
-  //#ifdef DEBUG
+  
+  #ifdef DEBUG
   if (nl)
     Serial.println(txt);
   else
     Serial.print(txt);
-  //#endif
+  #endif
 }
 
 void setup() {
@@ -386,7 +385,6 @@ void loop() {
 // *************************************************************
 
 void prepDisplay(int sec) {
-  // variable = (condition) ? expressionTrue : expressionFalse;
   bool isClosed = tState == TimerState::Closed;
   String ms;
   if (tState > TimerState::Closed) {
@@ -572,10 +570,10 @@ void initColors() {
 char dispPixelFade() {
   char retVal = 'n';
   int bRed = 2;
-  while (bRed < 50) {
+  while (bRed < 40) {
     pixel.setPixelColor(0, pixel.Color(bRed, 0, 0, 0));
     pixel.show();
-    retVal = waitMillis(55);
+    retVal = waitMillis(50);
     if (retVal != 'n') {
       bRed = -1;
       break;
@@ -585,7 +583,7 @@ char dispPixelFade() {
   while (bRed > 0) {
     pixel.setPixelColor(0, pixel.Color(bRed, 0, 0, 0));
     pixel.show();
-    retVal = waitMillis(55);
+    retVal = waitMillis(50);
     if (retVal != 'n') {
       break;
     }
